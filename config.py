@@ -1,0 +1,1 @@
+#its like storing the setting of the current app
