@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block content %}
+<h2 class="mb-4">Trekker Dashboard</h2>
+
+<h5>Your Bookings</h5>
+{% if bookings %}
+<div class="table-responsive mb-4">
+    <table class="table table-bordered table-hover bg-white">
+        <thead class="table-success">
+            <tr>
+                <th>Trek</th>
+                <th>Booking Date</th>
+                <th>Status</th>
+                <th>Payment Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for booking in bookings %}
+            <tr>
+                <td>{{ booking.trek.name }}</td>
+                <td>{{ booking.booking_date.strftime('%d-%m-%Y') }}</td>
+                <td>{{ booking.status }}</td>
+                <td>{{ booking.payment_status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted mb-4">You have not booked any treks yet.</p>
+{% endif %}
+
+<h5>Open Treks</h5>
+{% if open_treks %}
+<div class="row g-3">
+    {% for trek in open_treks %}
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title">{{ trek.name }}</h6>
+                <p class="card-text mb-1"><strong>Location:</strong> {{ trek.location }}</p>
+                <p class="card-text mb-1"><strong>Difficulty:</strong> {{ trek.difficulty }}</p>
+                <p class="card-text mb-1"><strong>Duration:</strong> {{ trek.duration }} day(s)</p>
+                <p class="card-text"><strong>Slots left:</strong> {{ trek.available_slots }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">No open treks right now. Check back soon!</p>
+{% endif %}
+
+<p class="text-muted mt-4">Booking and search functionality will be added in the next milestone.</p>
+{% endblock %}

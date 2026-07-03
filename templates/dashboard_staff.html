@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Staff Dashboard{% endblock %}
+{% block content %}
+<h2 class="mb-4">Trek Staff Dashboard</h2>
+
+<h5>Your Assigned Treks</h5>
+{% if assigned_treks %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover bg-white">
+        <thead class="table-success">
+            <tr>
+                <th>Trek Name</th>
+                <th>Location</th>
+                <th>Difficulty</th>
+                <th>Available Slots</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for trek in assigned_treks %}
+            <tr>
+                <td>{{ trek.name }}</td>
+                <td>{{ trek.location }}</td>
+                <td>{{ trek.difficulty }}</td>
+                <td>{{ trek.available_slots }} / {{ trek.total_slots }}</td>
+                <td>{{ trek.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No treks assigned yet.</p>
+{% endif %}
+
+<p class="text-muted mt-3">Trek slot/status updates and participant lists will be added in the next milestone.</p>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="p-5 mb-4 bg-light rounded-3 text-center">
+    <h1 class="display-5 fw-bold">Trekking Management Application</h1>
+    <p class="col-lg-8 mx-auto fs-5">
+        Plan, approve and track treks in one place. Admins manage treks and staff,
+        Trek Staff run their assigned treks, and Trekkers discover and book adventures.
+    </p>
+    {% if not session.get('user_id') %}
+    <div class="d-flex justify-content-center gap-2 mt-3">
+        <a href="{{ url_for('main.login') }}" class="btn btn-success btn-lg">Login</a>
+        <a href="{{ url_for('main.register_trekker') }}" class="btn btn-outline-success btn-lg">Register as Trekker</a>
+        <a href="{{ url_for('main.register_staff') }}" class="btn btn-outline-secondary btn-lg">Register as Staff</a>
+    </div>
+    {% else %}
+    <a href="{{ url_for('main.dashboard_redirect') }}" class="btn btn-success btn-lg mt-3">Go to Dashboard</a>
+    {% endif %}
+</div>
+{% endblock %}
