@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}All Bookings{% endblock %}
+{% block content %}
+<h2 class="mb-4">All Bookings & Trekking History</h2>
+
+{% if bookings %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover bg-white align-middle">
+        <thead class="table-success">
+            <tr>
+                <th>Booking ID</th>
+                <th>Trekker</th>
+                <th>Trek</th>
+                <th>Booking Date</th>
+                <th>Status</th>
+                <th>Payment Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for booking in bookings %}
+            <tr>
+                <td>{{ booking.id }}</td>
+                <td>{{ booking.user.name }}</td>
+                <td>{{ booking.trek.name }}</td>
+                <td>{{ booking.booking_date.strftime('%d-%m-%Y %H:%M') }}</td>
+                <td><span class="badge bg-secondary">{{ booking.status }}</span></td>
+                <td><span class="badge bg-info text-dark">{{ booking.payment_status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No bookings have been made yet.</p>
+{% endif %}
+{% endblock %}

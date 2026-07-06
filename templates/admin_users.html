@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Manage Users{% endblock %}
+{% block content %}
+<h2 class="mb-4">Manage Trekkers</h2>
+
+{% if users_list %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover bg-white align-middle">
+        <thead class="table-success">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Joined</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users_list %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.phone or "-" }}</td>
+                <td>{{ user.created_at.strftime('%d-%m-%Y') if user.created_at else "-" }}</td>
+                <td>
+                    {% if user.is_blacklisted %}
+                        <span class="badge bg-danger">Blacklisted</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark">Active</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.is_blacklisted %}
+                    <form method="POST" action="{{ url_for('main.admin_user_reactivate', user_id=user.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-success">Reactivate</button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('main.admin_user_blacklist', user_id=user.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Blacklist</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No trekkers registered yet.</p>
+{% endif %}
+{% endblock %}

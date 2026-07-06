@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash,request,session
 from models import db, User,StaffProfile, Trek, Booking
 from decorators import login_required, roles_required
+from datetime import datetime
 main_bp=Blueprint("main",__name__)
 #helpers
 def _current_user():
@@ -9,7 +10,14 @@ def _current_user():
     if not uid:
         return None
     return User.query.get(uid)
-
+def _parse_date(value):
+    """Converts an HTML date input string ('YYYY-MM-DD') to a date object, or None."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
 #main
 @main_bp.route("/")
 def index():
@@ -144,6 +152,240 @@ def admin_dashboard():
         total_bookings=total_bookings,
         pending_staff=pending_staff,
     )
+#admin-trekmanagement-create edit delete list assign staff
+@main_bp.route("/admin/treks")
+@roles_required("admin")
+def admin_treks():
+    treks=Trek.query.order_by(Trek.created_at.desc()).all()
+    return render_template("admin_treks.html",treks=treks)
+@main_bp.route("/admin/treks/new",methods=["GET","POST"])
+@roles_required("admin")
+def admin_trek_new():
+    approved_staff=User.query.filter_by(role="staff", is_approved=True,is_blacklisted=False).all()
+    if request.method=="POST":
+        name=request.form.get("name","").strip()
+        location=request.form.get("location","").strip()
+        difficulty=request.form.get("difficulty","Easy")
+        duration=request.form.get("duration","1")
+        description=request.form.get("description","").strip()
+        total_slots=request.form.get("total_slots","0")
+        assigned_staff_id=request.form.get("assigned_staff_id","") or None
+        status=request.form.get("status","Pending")
+        start_date=_parse_date(request.form.get("start_date"))
+        end_date=_parse_date(request.form.get("end_date"))
+        if not name or not location:
+            flash("Trek name and location are required.", "danger")
+            return redirect(url_for("main.admin_trek_new"))
+        
+        try:
+            duration=int(duration)
+            total_slots=int(total_slots)
+        except ValueError:
+            flash("Duration and slots must be numbers.", "danger")
+            return redirect(url_for("main.admin_trek_new"))
+
+        trek=Trek(
+            name=name,
+            location=location,
+            difficulty=difficulty,
+            duration=duration,
+            description=description,
+            total_slots=total_slots,
+            available_slots=total_slots,
+            assigned_staff_id=int(assigned_staff_id) if assigned_staff_id else None,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+        )  
+        db.session.add(trek)
+        db.session.commit()
+
+        flash(f"Trek '{trek.name}' created successfully.","success")
+        return redirect(url_for("main.admin_treks"))
+
+    return render_template("admin_trek_form.html",trek=None, approved_staff=approved_staff)
+
+@main_bp.route("/admin/treks/<int:trek_id>/edit",methods=["GET","POST"])
+@roles_required("admin")
+def admin_trek_edit(trek_id):
+    trek=Trek.query.get_or_404(trek_id)
+    approved_staff=User.query.filter_by(role="staff",is_approved=True,is_blacklisted=False).all()
+
+    if request.method=="POST":
+        name=request.form.get("name","").strip()
+        location=request.form.get("location","").strip()
+        difficulty=request.form.get("difficulty","Easy")
+        duration=request.form.get("duration","1")
+        description=request.form.get("description","").strip()
+        total_slots=request.form.get("total_slots","0")
+        assigned_staff_id=request.form.get("assigned_staff_id","") or None
+        status=request.form.get("status","Pending")
+        start_date=_parse_date(request.form.get("start_date"))
+        end_date=_parse_date(request.form.get("end_date"))
+
+        if not name or not location:
+            flash("Trek name and location are required.", "danger")
+            return redirect(url_for("main.admin_trek_edit",trek_id=trek_id))
+        
+        try:
+            duration=int(duration)
+            new_total_slots=int(total_slots)
+        except ValueError:
+            flash("Duration and slots must be numbers.", "danger")
+            return redirect(url_for("main.admin_trek_edit",trek_id=trek_id))
+        
+        #keeping available slots consistent when admin changes total-slots
+        slots_diff=new_total_slots-trek.total_slots
+        trek.available_slots=max(0,trek.available_slots+slots_diff)
+        trek.total_slots=new_total_slots
+
+        trek.name=name
+        trek.location=location
+        trek.difficulty=difficulty
+        trek.duration=duration
+        trek.description=description
+        trek.assigned_staff_id=int(assigned_staff_id) if assigned_staff_id else None
+        trek.status=status
+        trek.start_date=start_date
+        trek.end_date=end_date
+        db.session.commit()
+        flash(f"Trek '{trek.name}' updated successfully.","success")
+        return redirect(url_for("main.admin_treks"))
+    
+    return render_template("admin_trek_form.html",trek=trek, approved_staff=approved_staff)
+
+@main_bp.route("/admin/treks/<int:trek_id>/delete",methods=["POST"])
+@roles_required("admin")
+def admin_trek_delete(trek_id):
+    trek=Trek.query.get_or_404(trek_id)
+    name=trek.name
+    db.session.delete(trek)
+    db.session.commit()
+    flash(f"Trek '{name}' has been removed.","info")
+    return redirect(url_for("main.admin_treks"))
+
+
+#admin-staff management(approve,blacklist,reactivate,remove)
+@main_bp.route("/admin/staff")
+@roles_required("admin")
+def admin_staff():
+    staff_list=User.query.filter_by(role="staff").order_by(User.created_at.desc()).all()
+    return render_template("admin_staff.html",staff_list=staff_list)
+@main_bp.route("/admin/staff/<int:user_id>/approve",methods=["POST"])
+@roles_required("admin")
+def admin_staff_approve(user_id):
+    staff=User.query.filter_by(id=user_id,role="staff").first_or_404()
+    staff.is_approved=True
+    if staff.staff_profile:
+        staff.staff_profile.status="Approved"
+    db.session.commit()
+    flash(f"{staff.name} has been approved and can now log in","success")
+    return redirect(url_for("main.admin_staff"))
+
+@main_bp.route("/admin/staff/<int:user_id>/blacklist",methods=["POST"])
+@roles_required("admin")
+def admin_staff_blacklist(user_id):
+    staff=User.query.filter_by(id=user_id,role="staff").first_or_404()
+    staff.is_blacklisted=True
+    if staff.staff_profile:
+        staff.staff_profile.status="Blacklisted"
+    db.session.commit()
+    flash(f"{staff.name} has been blacklisted and cannot log in till admin decides","warning")
+    return redirect(url_for("main.admin_staff"))
+
+@main_bp.route("/admin/staff/<int:user_id>/reactivate",methods=["POST"])
+@roles_required("admin")
+def admin_staff_reactivate(user_id):
+    staff=User.query.filter_by(id=user_id,role="staff").first_or_404()
+    staff.is_blacklisted=False
+    if staff.staff_profile:
+        staff.staff_profile.status = "Approved" if staff.is_approved else "Pending"
+    db.session.commit()
+    flash(f"{staff.name} has been Reactivated and can log in","success")
+    return redirect(url_for("main.admin_staff"))
+
+@main_bp.route("/admin/staff/<int:user_id>/remove", methods=["POST"])
+@roles_required("admin")
+def admin_staff_remove(user_id):
+    staff=User.query.filter_by(id=user_id,role="staff").first_or_404()
+    name=staff.name
+    #unassign the task before removing if he is having any 
+    Trek.query.filter_by(assigned_staff_id=staff.id).update({"assigned_staff_id":None})
+    db.session.delete(staff)
+    db.session.commit()
+    flash(f"Staff member '{name}' has been removed.", "info")
+    return redirect(url_for("main.admin_staff"))
+
+#admin-trekker(user management)
+
+@main_bp.route("/admin/users")
+@roles_required("admin")
+def admin_users():
+    users_list=User.query.filter_by(role="trekker").order_by(User.created_at.desc()).all()
+    return render_template("admin_users.html",users_list=users_list)
+
+@main_bp.route("/admin/users/<int:user_id>/blacklist",methods=["POST"])
+@roles_required("admin")
+def admin_user_blacklist(user_id):
+    trekker=User.query.filter_by(id=user_id,role="trekker").first_or_404()
+    trekker.is_blacklisted=True
+    db.session.commit()
+    flash(f"{trekker.name} has been blacklisted.","warning")
+    return redirect(url_for("main.admin_users"))
+
+@main_bp.route("/admin/users/<int:user_id>/reactivate",methods=["POST"])
+@roles_required("admin")
+def admin_user_reactivate(user_id):
+    trekker=User.query.filter_by(id=user_id,role="trekker").first_or_404()
+    trekker.is_blacklisted=False
+    db.session.commit()
+    flash(f"{trekker.name} has been Reactivated","success")
+    return redirect(url_for("main.admin_users"))
+
+#admin-search(treks,staff,users by name or id)
+
+@main_bp.route("/admin/search")
+@roles_required("admin")
+def admin_search():
+    query=request.args.get("q", "").strip()
+    category=request.args.get("category","treks")
+    trek_results,staff_results,user_results=[],[],[]
+
+    if query:
+        is_numeric=query.isdigit()
+        if category=="treks":
+            q=Trek.query
+            if is_numeric:
+                trek_results=q.filter(Trek.id==int(query)).all()
+            else:
+                trek_results=q.filter(Trek.name.ilike(f"%{query}%")).all()
+        elif category=="staff":
+            q=User.query.filter_by(role="staff")
+            if is_numeric:
+                staff_results=q.filter(User.id==int(query)).all()
+            else:
+                staff_results=q.filter(User.name.ilike(f"%{query}%")).all()
+        elif category=="users":
+            q=User.query.filter_by(role="trekker")
+            if is_numeric:
+                user_results=q.filter(User.id==int(query)).all()
+            else:
+                user_results=q.filter(User.name.ilike(f"%{query}%")).all()        
+    return render_template(
+        "admin_search.html",
+        query=query,
+        category=category,
+        trek_results=trek_results,
+        staff_results=staff_results,
+        user_results=user_results,
+    )
+
+#admin-can view bookings and full trekking history
+@main_bp.route("/admin/bookings")
+@roles_required("admin")
+def admin_bookings():
+    bookings=Booking.query.order_by(Booking.booking_date.desc()).all()
+    return render_template("admin_bookings.html",bookings=bookings)
 #staff dashboard
 @main_bp.route("/staff/dashboard")
 @roles_required("staff")
@@ -151,7 +393,6 @@ def staff_dashboard():
     user=_current_user()
     assigned_treks=Trek.query.filter_by(assigned_staff_id=user.id).all()
     return render_template("dashboard_staff.html",assigned_treks=assigned_treks)
-
 #trekker(user) dashboard
 @main_bp.route("/user/dashboard")
 @roles_required("trekker")
@@ -160,11 +401,3 @@ def trekker_dashboard():
     bookings=Booking.query.filter_by(user_id=user.id).all()
     open_treks=Trek.query.filter_by(status="Open").all()
     return render_template("dashboard_user.html",bookings=bookings,open_treks=open_treks)
-
-
-
-
-
-        
-
-

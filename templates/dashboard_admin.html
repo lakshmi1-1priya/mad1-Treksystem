@@ -4,10 +4,12 @@
 <h2 class="mb-4">Admin Dashboard</h2>
 
 {% if pending_staff > 0 %}
-<div class="alert alert-warning">
-    You have <strong>{{ pending_staff }}</strong> staff registration(s) awaiting approval.
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+    <span>You have <strong>{{ pending_staff }}</strong> staff registration(s) awaiting approval.</span>
+    <a href="{{ url_for('main.admin_staff') }}" class="btn btn-sm btn-warning">Review Now</a>
 </div>
 {% endif %}
+
 
 <div class="row g-3">
     <div class="col-md-3">
@@ -44,5 +46,12 @@
     </div>
 </div>
 
-<p class="text-muted mt-4">Trek management, staff approval, and search tools will be added in the next milestone.</p>
+<div class="d-flex flex-wrap gap-2 mt-4">
+    <a href="{{ url_for('main.admin_treks') }}" class="btn btn-outline-success">Manage Treks</a>
+    <a href="{{ url_for('main.admin_staff') }}" class="btn btn-outline-success">Manage Staff</a>
+    <a href="{{ url_for('main.admin_users') }}" class="btn btn-outline-success">Manage Trekkers</a>
+    <a href="{{ url_for('main.admin_bookings') }}" class="btn btn-outline-success">View Bookings</a>
+    <a href="{{ url_for('main.admin_search') }}" class="btn btn-outline-success">Search</a>
+</div>
+
 {% endblock %}
