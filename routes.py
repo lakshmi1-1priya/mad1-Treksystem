@@ -386,13 +386,127 @@ def admin_search():
 def admin_bookings():
     bookings=Booking.query.order_by(Booking.booking_date.desc()).all()
     return render_template("admin_bookings.html",bookings=bookings)
+#staff-helpers
+STAFF_STATUS_OPTIONS=["Open","Closed","Ongoing","Completed"]
+
+def _assigned_trek_or_none(trek_id,staff_id):
+    "Fetch a trek only if it is assigned to this staff member,else None"
+    return Trek.query.filter_by(id=trek_id,assigned_staff_id=staff_id).first()
 #staff dashboard
 @main_bp.route("/staff/dashboard")
 @roles_required("staff")
 def staff_dashboard():
     user=_current_user()
     assigned_treks=Trek.query.filter_by(assigned_staff_id=user.id).all()
-    return render_template("dashboard_staff.html",assigned_treks=assigned_treks)
+    #registered trekker(users) count per trek, searched by trek id
+    trekker_counts={}
+    for trek in assigned_treks:
+        trekker_counts[trek.id]=Booking.query.filter_by(
+            trek_id=trek.id,status="Booked"
+        ).count()
+    return render_template(
+        "dashboard_staff.html",
+        assigned_treks=assigned_treks,
+        trekker_counts=trekker_counts,
+        )
+#staff profile
+@main_bp.route("/staff/profile",methods=["GET","POST"])
+@roles_required("staff")
+def staff_profile():
+    user=_current_user()
+    if(request.method=="POST"):
+        name=request.form.get("name","").strip()
+        phone=request.form.get("phone","").strip()
+        experience_years=request.form.get("experience_years","0").strip()
+
+        if not name:
+            flash("Name is required.","danger")
+            return redirect(url_for("main.staff_profile"))
+        
+        try:
+            experience_years=int(experience_years)
+        except ValueError:
+            experience_years=0
+        user.name=name
+        user.phone=phone
+        session["name"]=name  #navbar greeting in sync
+
+        if user.staff_profile:
+            user.staff_profile.contact_details=phone   
+            user.staff_profile.experience_years=experience_years
+
+        new_password=request.form.get("new_password","")
+        confirm_password=request.form.get("confirm_password","")
+        if new_password:
+            if new_password!=confirm_password:
+                flash("New password do not match. Other changes were not saved","danger")
+                return redirect(url_for("main.staff_profile"))
+            user.set_password(new_password)
+        db.session.commit()
+        flash("Profile updated successfully","success")
+        return redirect(url_for("main.staff_profile"))
+    return render_template("staff_profile.html",user=user)
+
+#staff-assigned trek details and management
+
+@main_bp.route("/staff/treks/<int:trek_id>")
+@roles_required("staff")
+def staff_trek_detail(trek_id):
+    user=_current_user()
+    trek=_assigned_trek_or_none(trek_id,user.id)
+    if trek is None:
+        flash("That trek is not assigned to you","danger")
+        return redirect(url_for("main.staff_dashboard"))
+    bookings=Booking.query.filter_by(trek_id=trek.id).order_by(Booking.booking_date.desc()).all()
+    return render_template(
+        "staff_trek_detail.html",
+        trek=trek,
+        bookings=bookings,
+        status_options=STAFF_STATUS_OPTIONS,
+    )
+#to update trek details
+@main_bp.route("/staff/treks/<int:trek_id>/update",methods=["POST"])
+@roles_required("staff")
+def staff_trek_update(trek_id):
+    user=_current_user()
+    trek=_assigned_trek_or_none(trek_id,user.id)
+    if trek is None:
+        flash("That trek is not assigned to you.","danger")
+        return redirect(url_for("main.staff_dashboard"))
+    available_slots=request.form.get("available_slots","").strip()
+    status=request.form.get("status",trek.status)
+    try:
+        available_slots=int(available_slots)
+    except ValueError:
+        flash("Available slots must be a number","danger")
+        return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
+    if available_slots<0 or available_slots>trek.total_slots:
+        flash(f"Available slots must be between 0 and {trek.total_slots}.","danger")
+        return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
+    if status not in STAFF_STATUS_OPTIONS:
+        flash("Invalid status selected","danger")
+        return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
+    trek.available_slots=available_slots
+    trek.status=status
+    db.session.commit()
+
+    flash(f"Trek '{trek.name}' updated: slot={available_slots}, status={status}.","success")
+    return redirect(url_for("main.staff_trek_detail",trek_id=trek.id)) 
+
+@main_bp.route("/staff/trek/<int:trek_id>/bookings/<int:booking_id>/complete",methods=["POST"])
+@roles_required("staff")
+def staff_booking_complete(trek_id,booking_id):
+    user=_current_user()
+    trek=_assigned_trek_or_none(trek_id,user.id)
+    if trek is None:
+        flash("That trek is not assigned to you.","danger")
+        return redirect(url_for("main.staff_dashboard"))
+    booking=Booking.query.filter_by(id=booking_id,trek_id=trek.id).first_or_404()
+    booking.status="Completed"
+    db.session.commit()
+    flash(f"Marked {booking.user.name}'s booking as completed.","success")
+    return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
+
 #trekker(user) dashboard
 @main_bp.route("/user/dashboard")
 @roles_required("trekker")

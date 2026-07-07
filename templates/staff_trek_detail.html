@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Manage {{ trek.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">{{ trek.name }}</h2>
+    <a href="{{ url_for('main.staff_dashboard') }}" class="btn btn-outline-secondary btn-sm">&larr; Back to Dashboard</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Location</h6>
+                <p class="mb-0 fw-bold">{{ trek.location }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Difficulty</h6>
+                <p class="mb-0 fw-bold">{{ trek.difficulty }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Duration</h6>
+                <p class="mb-0 fw-bold">{{ trek.duration }} day(s)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Current Status</h6>
+                <p class="mb-0 fw-bold">{{ trek.status }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+        <h5 class="card-title mb-3">Update Slots & Status</h5>
+        <form method="POST" action="{{ url_for('main.staff_trek_update', trek_id=trek.id) }}">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Available Slots (of {{ trek.total_slots }})</label>
+                    <input type="number" name="available_slots" min="0" max="{{ trek.total_slots }}"
+                           class="form-control" value="{{ trek.available_slots }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Trek Status</label>
+                    <select name="status" class="form-select">
+                        {% for s in status_options %}
+                        <option value="{{ s }}" {% if trek.status == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-success w-100">Save Update</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h5>Registered Trekkers ({{ bookings|length }})</h5>
+{% if bookings %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover bg-white align-middle">
+        <thead class="table-success">
+            <tr>
+                <th>Booking ID</th>
+                <th>Trekker</th>
+                <th>Email</th>
+                <th>Booking Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for booking in bookings %}
+            <tr>
+                <td>{{ booking.id }}</td>
+                <td>{{ booking.user.name }}</td>
+                <td>{{ booking.user.email }}</td>
+                <td>{{ booking.booking_date.strftime('%d-%m-%Y') }}</td>
+                <td><span class="badge bg-secondary">{{ booking.status }}</span></td>
+                <td>
+                    {% if booking.status == "Booked" %}
+                    <form method="POST" action="{{ url_for('main.staff_booking_complete', trek_id=trek.id, booking_id=booking.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-success">Mark Completed</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No trekkers have booked this trek yet.</p>
+{% endif %}
+{% endblock %}
