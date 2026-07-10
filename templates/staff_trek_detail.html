@@ -78,6 +78,7 @@
                 <th>Email</th>
                 <th>Booking Date</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -90,9 +91,21 @@
                 <td>{{ booking.booking_date.strftime('%d-%m-%Y') }}</td>
                 <td><span class="badge bg-secondary">{{ booking.status }}</span></td>
                 <td>
+                    {% if booking.payment_status == "Paid" %}
+                        <span class="badge bg-success">Paid</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">{{ booking.payment_status }}</span>
+                    {% endif %}
+                </td>
+                <td class="d-flex flex-wrap gap-1">
                     {% if booking.status == "Booked" %}
                     <form method="POST" action="{{ url_for('main.staff_booking_complete', trek_id=trek.id, booking_id=booking.id) }}">
                         <button type="submit" class="btn btn-sm btn-outline-success">Mark Completed</button>
+                    </form>
+                    {% endif %}
+                    {% if booking.payment_status != "Paid" %}
+                    <form method="POST" action="{{ url_for('main.staff_booking_mark_paid', trek_id=trek.id, booking_id=booking.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Mark Paid</button>
                     </form>
                     {% endif %}
                 </td>

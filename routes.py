@@ -507,11 +507,123 @@ def staff_booking_complete(trek_id,booking_id):
     flash(f"Marked {booking.user.name}'s booking as completed.","success")
     return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
 
-#trekker(user) dashboard
+#payment_status
+@main_bp.route("/staff/trek/<int:trek_id>/bookings/<int:booking_id>/mark_paid",methods=["POST"])
+@roles_required("staff")
+def staff_booking_mark_paid(trek_id,booking_id):
+    user=_current_user()
+    trek=_assigned_trek_or_none(trek_id,user.id)
+    if trek is None:
+        flash("That trek is not assigned to you.","danger")
+        return redirect(url_for("main.staff_dashboard"))
+    booking=Booking.query.filter_by(id=booking_id,trek_id=trek.id).first_or_404()
+    booking.payment_status="Paid"
+    db.session.commit()
+    flash(f"Marked {booking.user.name}'s payment as Paid.","success")
+    return redirect(url_for("main.staff_trek_detail",trek_id=trek.id))
+
+
+#trekker(user) dashboard,profile,browse/search, booking
 @main_bp.route("/user/dashboard")
 @roles_required("trekker")
 def trekker_dashboard():
     user=_current_user()
     bookings=Booking.query.filter_by(user_id=user.id).all()
-    open_treks=Trek.query.filter_by(status="Open").all()
+    open_treks=Trek.query.filter_by(status="Open").order_by(Trek.created_at.desc()).limit(6).all()
     return render_template("dashboard_user.html",bookings=bookings,open_treks=open_treks)
+
+@main_bp.route("/user/profile",methods=["GET","POST"])
+@roles_required("trekker")
+def trekker_profile():
+    user=_current_user()
+
+    if request.method=="POST":
+        name=request.form.get("name","").strip()
+        phone=request.form.get("phone","").strip()
+        if not name:
+            flash("Name is required","danger")
+            return redirect(url_for("main.trekker_profile"))
+        user.name=name
+        user.phone=phone
+        session["name"]=name #keep navbar greeting in sequence
+        new_password=request.form.get("new_password","")
+        confirm_password=request.form.get("confirm_password","")
+        if new_password:
+            if new_password!=confirm_password:
+                flash("New password do not  match.Other changes not saved.","danger")
+                return redirect(url_for("main.trekker_profile"))
+            user.set_password(new_password)
+        db.session.commit()
+        flash("Profile updated successfully.","success")
+        return redirect(url_for("main.trekker_profile"))
+    return render_template("user_profile.html",user=user)
+
+@main_bp.route("/user/treks")
+@roles_required("trekker")
+def trekker_treks():
+    """Browse open treks with filters by difficulty  and location"""
+    location=request.args.get("location","").strip()
+    difficulty=request.args.get("difficulty","").strip()
+
+    query=Trek.query.filter_by(status="Open")
+
+    if location:
+        query=query.filter(Trek.location.ilike(f"%{location}%")) 
+    if difficulty:
+        query=query.filter(Trek.difficulty==difficulty)
+    treks=query.order_by(Trek.start_date.asc().nullslast()).all()
+
+    user=_current_user()
+    #ids of trek this trekker already has an active booking
+    booked_trek_ids={
+        b.trek_id
+        for b in Booking.query.filter_by(user_id=user.id,status="Booked").all()
+    }
+    return render_template(
+        "user_treks.html",
+        treks=treks,
+        location=location,
+        difficulty=difficulty,
+        booked_trek_ids=booked_trek_ids,
+    )
+
+
+@main_bp.route("/user/treks/<int:trek_id>/book",methods=["POST"])
+@roles_required("trekker")
+def trekker_book_trek(trek_id):
+    user=_current_user()
+    trek=Trek.query.get_or_404(trek_id)
+    if trek.status!="Open":
+        flash(f"'{trek.name}'is not open for booking right now.","danger")
+        return redirect(url_for("main.trekker_treks"))
+    if trek.available_slots<=0:
+        flash(f"'{trek.name}' is fully booked. No slots available.","danger")
+        return redirect(url_for("main.trekker_treks"))
+    existing=Booking.query.filter_by(
+        user_id=user.id,trek_id=trek.id,status="Booked"
+    ).first()
+    if existing:
+        flash(f"You have already booked'{trek.name}'.","warning")
+        return redirect(url_for("main.trekker_treks"))
+    booking=Booking(user_id=user.id,trek_id=trek.id,status="Booked",payment_status="Pending")
+    trek.available_slots-=1
+    db.session.add(booking)
+    db.session.commit()
+    flash(f"Trek '{trek.name}' booked successfully.!","success")
+    return redirect(url_for("main.trekker_dashboard"))
+
+@main_bp.route("/user/bookings/<int:booking_id>/cancel",methods=["POST"])
+@roles_required("trekker")
+def trekker_cancel_booking(booking_id):
+    user=_current_user()
+    booking=Booking.query.filter_by(id=booking_id,user_id=user.id).first_or_404()
+    if booking.status!="Booked":
+        flash("Only active bookings can be cancelled","danger")
+        return redirect(url_for("main.trekker_dashboard"))
+    booking.status="Cancelled"
+    booking.trek.available_slots+=1
+    db.session.commit()
+    flash(f"Booking for '{booking.trek.name}' has been cancelled","info")
+    return redirect(url_for("main.trekker_dashboard"))
+
+    
