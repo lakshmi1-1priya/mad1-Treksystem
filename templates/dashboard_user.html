@@ -14,6 +14,8 @@
             <tr>
                 <th>Trek</th>
                 <th>Location</th>
+                <th>Difficulty</th>
+                <th>Trek Dates</th>
                 <th>Booking Date</th>
                 <th>Status</th>
                 <th>Payment Status</th>
@@ -25,6 +27,15 @@
             <tr>
                 <td>{{ booking.trek.name }}</td>
                 <td>{{ booking.trek.location }}</td>
+                <td>{{ booking.trek.difficulty }}</td>
+                <td>
+                    {% if booking.trek.start_date %}
+                        {{ booking.trek.start_date.strftime('%d-%m-%Y') }} &ndash;
+                        {{ booking.trek.end_date.strftime('%d-%m-%Y') if booking.trek.end_date else '?' }}
+                    {% else %}
+                        <span class="text-muted">Not set</span>
+                    {% endif %}
+                </td>
                 <td>{{ booking.booking_date.strftime('%d-%m-%Y') }}</td>
                 <td>
                     {% if booking.status == "Booked" %}

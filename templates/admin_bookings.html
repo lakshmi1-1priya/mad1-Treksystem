@@ -2,6 +2,19 @@
 {% block title %}All Bookings{% endblock %}
 {% block content %}
 <h2 class="mb-4">All Bookings & Trekking History</h2>
+<form method="GET" action="{{ url_for('main.admin_bookings') }}" class="row g-2 mb-4">
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+            <option value="Booked" {% if status_filter == "Booked" %}selected{% endif %}>Booked</option>
+            <option value="Cancelled" {% if status_filter == "Cancelled" %}selected{% endif %}>Cancelled</option>
+            <option value="Completed" {% if status_filter == "Completed" %}selected{% endif %}>Completed</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-success w-100">Filter</button>
+    </div>
+</form>
 
 {% if bookings %}
 <div class="table-responsive">

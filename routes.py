@@ -384,10 +384,14 @@ def admin_search():
 @main_bp.route("/admin/bookings")
 @roles_required("admin")
 def admin_bookings():
-    bookings=Booking.query.order_by(Booking.booking_date.desc()).all()
+    status_filter = request.args.get("status", "").strip()
+    query = Booking.query
+    if status_filter in ("Booked", "Cancelled", "Completed"):
+        query = query.filter_by(status=status_filter)
+    bookings=query.order_by(Booking.booking_date.desc()).all()
     return render_template("admin_bookings.html",bookings=bookings)
 #staff-helpers
-STAFF_STATUS_OPTIONS=["Open","Closed","Ongoing","Completed"]
+STAFF_STATUS_OPTIONS=["Open","Closed","Completed"]
 
 def _assigned_trek_or_none(trek_id,staff_id):
     "Fetch a trek only if it is assigned to this staff member,else None"
@@ -493,7 +497,7 @@ def staff_trek_update(trek_id):
     flash(f"Trek '{trek.name}' updated: slot={available_slots}, status={status}.","success")
     return redirect(url_for("main.staff_trek_detail",trek_id=trek.id)) 
 
-@main_bp.route("/staff/trek/<int:trek_id>/bookings/<int:booking_id>/complete",methods=["POST"])
+@main_bp.route("/staff/treks/<int:trek_id>/bookings/<int:booking_id>/complete",methods=["POST"])
 @roles_required("staff")
 def staff_booking_complete(trek_id,booking_id):
     user=_current_user()
